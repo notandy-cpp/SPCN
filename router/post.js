@@ -1,77 +1,119 @@
 const express = require("express");
 const router = express.Router();
-const Comment = require("../model/comment");
+const Post = require("../model/post");
 const { authMiddleware: auth, adminRole } = require("../middleware/auth");
 
 const {
-  createComment,
-  getCommentsByPostId,
-  getCommentsByUserId,
-  getCommentById,
-  updateComment,
-  deleteComment,
-} = require("../controller/comment");
+  createPost,
+  getPosts,
+  getPostsByUserId,
+  getPostById,
+  updatePost,
+  deletePost,
+} = require("../controller/post");
 
-// Create a new comment
-router.post("/comment", auth, async (req, res) => {
+// Create a new post
+router.post("/api/posts", auth, async (req, res) => {
   try {
-    const user_id = req.user._id;
-    req.body.user_id = user_id;
-    const comment = await createComment(req.body);
+    const data = {
+      user_id: req.user._id,
+      title: req.body.title,
+      content: req.body.content,
+    };
+    const post = await createPost(data);
+    res.status(201).send({ message: "Tạo bài viết thành công", data: post });
+  } catch (error) {
+    res.status(error.statusCode || 500).send({ message: error.message });
+  }
+});
+
+// Get posts
+router.get("/api/posts", async (req, res) => {
+  try {
+    const posts = await getPosts();
     res
-      .status(201)
-      .json({ message: "Tạo bình luận thành công", data: comment });
+      .status(200)
+      .send({ message: "Lấy danh sách bài viết thành công", data: posts });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message });
+    res.status(error.statusCode || 500).send({ message: error.message });
   }
 });
 
-// Get comments
-router.get("/comment/post/:post_id", async (req, res) => {
-  try {
-    const post_id = req.params.post_id;
-    const comments = await getCommentsByPostId(post_id);
-    res.status(200).json({
-      message: "Lấy danh sách bình luận thành công",
-      data: { comments, post_id: post_id },
-    });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message });
-  }
-});
-
-router.get("/comment/user/:user_id", async (req, res) => {
+router.get("/api/posts/user/:user_id", async (req, res) => {
   try {
     const user_id = req.params.user_id;
-    const comments = await getCommentsByUserId(user_id);
-    res.status(200).json({
-      message: "Lấy danh sách bình luận thành công",
-      data: { comments, user_id: user_id },
+    const posts = await getPostsByUserId(user_id);
+    res
+      .status(200)
+      .send({ message: "Lấy danh sách bài viết thành công", data: posts });
+  } catch (error) {
+    res.status(error.statusCode || 500).send({ message: error.message });
+  }
+});
+
+router.get("/api/me/posts", auth, async (req, res) => {
+  try {
+    const user_id = req.user._id;
+    const posts = await getPostsByUserId(user_id);
+    res
+      .status(200)
+      .send({ message: "Lấy danh sách bài viết thành công", data: posts });
+  } catch (error) {
+    res.status(error.statusCode || 500).send({ message: error.message });
+  }
+});
+
+router.get("/api/posts/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const post = await getPostById(id);
+    res.status(200).send({ message: "Lấy bài viết thành công", data: post });
+  } catch (error) {
+    res.status(error.statusCode || 500).send({ message: error.message });
+  }
+});
+
+// Update post
+router.put("/api/posts/:id", auth, async (req, res) => {
+  try {
+    const user = req.user;
+    const id = req.params.id;
+    const updateData = {
+      title: req.body.title,
+      content: req.body.content,
+    };
+    const post = await updatePost(id, updateData, user);
+    res
+      .status(200)
+      .send({ message: "Cập nhật bài viết thành công", data: post });
+  } catch (error) {
+    res.status(error.statusCode || 500).send({ message: error.message });
+  }
+});
+
+router.put("/api/upvote/posts/:id", auth, async (req, res) => {
+  try {
+    const updateData = {
+      $inc: { upVotes: 1 },
+    };
+    const post = await Post.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
     });
+    res.status(200).send({ message: "Upvote bài viết thành công", data: post });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message });
+    res.status(error.statusCode || 500).send({ message: error.message });
   }
 });
 
-// Update comment
-router.put("/comment/:id", auth, async (req, res) => {
+// Delete post
+router.delete("/api/posts/:id", auth, async (req, res) => {
   try {
+    const user = req.user;
     const id = req.params.id;
-    await updateComment(id, req.body, req.user);
-    res.status(200).json({ message: "Cập nhật bình luận thành công" });
+    const post = await deletePost(id, user);
+    res.status(200).send({ message: "Xóa bài viết thành công", data: post });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message });
-  }
-});
-
-// Delete comment
-router.delete("/comment/:id", auth, async (req, res) => {
-  try {
-    const id = req.params.id;
-    await deleteComment(id, req.user);
-    res.status(200).json({ message: "Xóa bình luận thành công" });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message });
+    res.status(error.statusCode || 500).send({ message: error.message });
   }
 });
 

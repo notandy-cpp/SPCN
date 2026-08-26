@@ -30,7 +30,7 @@ const getPosts = async() =>
 }
 
 
-const getPostByUserID = async(user_id) =>
+const getPostsByUserId = async(user_id) =>
 {
     try
     {
@@ -51,7 +51,7 @@ const getPostByUserID = async(user_id) =>
     }
 }
 
-const getPostByID = async(id) =>
+const getPostById = async(id) =>
 {
     try
     {
@@ -121,7 +121,7 @@ const deletePost = async(id) =>
             err.message = "Bai viet khong ton tai";
             throw err;
         }
-        if (user.role !== "admin" && post.user_id !== user._id) 
+        if (user.role !== "admin") 
         {
             const err = new Error();
             err.statusCode = 403;
@@ -141,8 +141,7 @@ const deletePost = async(id) =>
 module.exports = {
   createPost,
   getPosts,
-  getPostByUserID,
-  getPostByID,
+  getPostById,
   updatePost,
   deletePost,
 };

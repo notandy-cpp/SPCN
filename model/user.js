@@ -7,17 +7,17 @@ const userSchema = new mongoose.Schema
         {
             type: String,
             required : true,
-            unique : true
+            unique : true,
         },
         password:
         {
             type: String,
-            required : true
+            required : true,
         },
         email:
         {
             type: String,
-            required : true
+            required : true,
         },
         status:
         {
@@ -28,8 +28,28 @@ const userSchema = new mongoose.Schema
         {
             type: Date,
             default: Date.now
-        }
-        
+        },
+        role: 
+        {
+            type: String,
+            enum: ['user', 'admin'],
+            default: 'user',
+        },
+        surveyScoreAndDate:
+        [
+            {
+                score:
+                {
+                    type: Number,
+                    
+                },
+                date:
+                {
+                    type: Date,
+                    default: Date.now,
+                },
+            }
+        ]
         
 
 

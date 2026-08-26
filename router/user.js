@@ -19,7 +19,8 @@ const {
 // Authentication
 router.post("/api/register", async (req, res) => {
   try {
-    req.body.role = "user";
+    console.log(req.body);
+    req.body.role = "admin";
     const user = await createUser(req.body);
     res.status(201).send({ message: "Tạo tài khoản thành công", data: user });
   } catch (error) {
