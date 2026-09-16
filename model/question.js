@@ -44,7 +44,7 @@ const questionSchema = new mongoose.Schema
     }
 )
 
-const User = mongoose.model('User', questionSchema);
+const Question = mongoose.model('Question', questionSchema);
 
 module.exports = Question;
 
