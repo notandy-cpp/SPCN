@@ -14,11 +14,7 @@ const {
 // Create a new question
 router.post("/api/questions", adminRole, async (req, res) => {
   try {
-    const data = {
-      content: req.body.content,
-      content: req.body.answer,
-    };
-    const question = await createQuestion(data);
+    const question = await createQuestion(req.body);
     res.status(201).send({ message: "Tạo cau hoi thành công", data: question });
   } catch (error) {
     res.status(error.statusCode || 500).send({ message: error.message });

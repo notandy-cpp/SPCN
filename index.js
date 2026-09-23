@@ -3,7 +3,7 @@ const express = require('express');
 require('dotenv').config({path: "./.env"});
 const {connectDB} = require('./db/db');
 const cookieParser = require('cookie-parser');
-const userRouter = require("./router/user");
+const rootRouter = require("./util/rootRouter");
 
 const app = express();
 
@@ -32,7 +32,7 @@ app.use(express.json());
 app.use(express.urlencoded({extended : true}));
 app.use(cookieParser());
 
-app.use(userRouter);
+app.use(rootRouter);
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 app.get('/', (req, res) =>

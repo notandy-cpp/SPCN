@@ -16,9 +16,8 @@ const {
 router.post("/api/comment", auth, async (req, res) => {
   try {
     const user_id = req.user._id;
-    const content = req.content;
     req.body.user_id = user_id;
-    req.body.content = content;
+    
     const comment = await createComment(req.body);
     res
       .status(201)
