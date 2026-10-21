@@ -22,7 +22,7 @@ const getChats = async(data) =>
     {
         const username = data.username;
         // await Chat.find({ userList: {username: /${username}/i }, null, { skip: 10 }).exec();
-        const chat = await Chat.find({ userList: {username: {$regex: username, $options:'i'} } }).exec();
+        const chat = await Chat.find().exec();
         // find all documents
 // await MyModel.find({});
 
@@ -34,6 +34,7 @@ const getChats = async(data) =>
 
 // // passing options
 // await MyModel.find({ name: /john/i }, null, { skip: 10 }).exec();
+
         if(!chat)
         {
             const err = new Error();
@@ -42,7 +43,18 @@ const getChats = async(data) =>
             throw err;
         }
 
-        return chat;
+        function matchedUsername(chat)
+        { 
+            let len = chat.userList.length;
+            for (let i = 0; i < len; i++) 
+            {
+                if (username === chat.userList[i].username) return true;
+            }
+            return false;
+        }
+
+        let resultChat = chat.filter(matchedUsername);
+        return resultChat;
     }
     catch (error)
     {
@@ -127,6 +139,144 @@ const editChat = async(id, updateData) =>
     }
 }
 
+const sendMessage = async (id, user, data) =>
+{
+    try {
+        const { content, replyTo = null } = data;
+        if (!content.trim()) 
+        {
+            const err = new Error();
+            err.statusCode = 400;
+            err.message = "Tin nhan khong hop le";
+            throw err;
+        }
+        const chat = await Chat.findById(id);
+        
+        if (!chat){
+            const err = new Error();
+            err.statusCode = 404;
+            err.message = "Doan chat khong ton tai";
+            throw err;
+            
+        }
+        const isMember = chat.userList.some(
+            (member) => member.username === user.username
+        );
+
+        if (!isMember){
+            const err = new Error();
+            err.statusCode = 403;
+            err.message = "Nguoi dung khong thuoc doan chat";
+            throw err;
+        }
+
+        chat.messages.push({
+            sender: user.username,
+            content: content.trim(),
+            replyTo,
+        });
+
+        await chat.save();
+        const message = chat.messages[chat.messages.length - 1];
+        return message;
+
+
+    } catch (error) {
+        throw error;
+    }
+}
+
+const editMessage = async (id, user, data) =>
+{
+    try {
+        const { content, index = null } = data;
+        if (!content.trim()) 
+        {
+            const err = new Error();
+            err.statusCode = 400;
+            err.message = "Tin nhan khong hop le";
+            throw err;
+        }
+        const chat = await Chat.findById(id);
+        
+        if (!chat){
+            const err = new Error();
+            err.statusCode = 404;
+            err.mecssage = "Doan chat khong ton tai";
+            throw err;
+            
+        }
+        
+        
+
+        if (!chat.messages[index].sender === user.username)
+        {
+            const err = new Error();
+            err.statusCode = 400;
+            err.mecssage = "Khong the sua tin nhan nguoi dung khac";
+            throw err;
+        }
+        
+        
+
+        const message = {
+            content : content.trim(),
+            edited : true,
+        }
+
+            chat.messages[index] = {
+            ...message
+        }
+
+
+
+        await chat.save();
+        
+        return chat.messages[index];
+
+
+    } catch (error) {
+        throw error;
+    }
+}
+
+const deleteMessage = async (id, user, index) =>
+{
+    try {
+        const chat = await Chat.findById(id);
+        
+        if (!chat){
+            const err = new Error();
+            err.statusCode = 404;
+            err.mecssage = "Doan chat khong ton tai";
+            throw err;
+            
+        }
+                
+        const adminList = chat.userList;
+
+        let checkAuth = false;
+        adminList.forEach(member => {if (member.role === "admin" && member.username === user.username || (chat.messages[index].sender === user.username) ) {checkAuth = true;}});
+        if(!checkAuth)
+        {
+            const err = new Error();
+            err.statusCode = 403;
+            err.message = "Bạn không có quyền xoa tin nhan này";
+            throw err;
+        }
+        
+        chat.messages[index].deleted = true;
+
+        await chat.save();
+        
+        return chat.messages[index];
+
+
+    } catch (error) {
+        throw error;
+    }
+}
+
 
 
 
@@ -135,5 +285,8 @@ module.exports = {
     getChats,
     getChatById,
     deleteChat,
-    editChat
+    editChat,
+    sendMessage,
+    editMessage,
+    deleteMessage,
 };

@@ -39,7 +39,7 @@ const chatSchema = new mongoose.Schema
                     type: String
                 },
                 replyTo:{
-                    type: String,
+                    type: Number,
                     default: null
                 },
                 sentDate:{

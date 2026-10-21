@@ -8,7 +8,10 @@ const {
     getChats,
     getChatById,
     deleteChat,
-    editChat
+    editChat,
+    sendMessage,
+    editMessage,
+    deleteMessage,
 } = require("../controller/chat");
 
 // Create a new chat
@@ -73,4 +76,42 @@ router.delete("/api/chats/:chat_id", auth, async (req, res) => {
   }
 });
 
+router.post("/api/messages/:chat_id", auth, async (req, res) => {
+  try {
+    const id = req.params.chat_id;
+    const sent_message = await sendMessage(id, req.user, req.body);
+    res.status(201).send({ message: "Gui tin nhan thanh cong", data: sent_message});
+  } catch (error) {
+    res.status(error.statusCode || 500).send({ message: error.message });
+  }
+});
+
+router.put("/api/messages/:chat_id ", auth, async (req, res) => {
+  try {
+    const id = req.params.chat_id;
+    const index = req.body.index;
+    const target_message = await editMessage(id, req.user, req.body);
+    res.status(201).send({ message: "Sua tin nhan thanh cong", data: target_message});
+  } catch (error) {
+    res.status(error.statusCode || 500).send({ message: error.message });
+  }
+});
+
+router.delete("/api/messages/:chat_id ", auth, async (req, res) => {
+  try {
+    const id = req.params.chat_id;
+    const index = req.body.index;
+    const target_message = await deleteMessage(id, req.user, index);
+    res.status(201).send({ message: "Xoa tin nhan thanh cong", data: target_message});
+  } catch (error) {
+    res.status(error.statusCode || 500).send({ message: error.message });
+  }
+});
+
+
+
+
+
+
 module.exports = router;
+

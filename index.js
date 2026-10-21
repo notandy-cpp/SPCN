@@ -1,3 +1,6 @@
+
+
+// const { Server } = require("socket.io");
 const express = require('express');
 
 require('dotenv').config({path: "./.env"});
@@ -5,10 +8,22 @@ const {connectDB} = require('./db/db');
 const cookieParser = require('cookie-parser');
 const rootRouter = require("./util/rootRouter");
 
+
+
+
+
+
+
+
+
+
+
+
 const app = express();
 
 const port = process.env.PORT;
 
+// const io = new Server({ /* options */ });
 
 const cors = require("cors");
 // require("node:dns/promises").setServers(["1.1.1.1", "8.8.8.8"]);
@@ -46,3 +61,8 @@ app.listen(port, "0.0.0.0",  () =>
 });
 
 
+// io.on("connection", (socket) => {
+//   // ...
+// });
+
+// io.listen(3000);
