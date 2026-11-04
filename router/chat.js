@@ -36,10 +36,11 @@ router.get("/api/chats", auth, async (req, res) => {
   }
 });
 
-router.get("/api/chats/:chat_id", async (req, res) => {
+router.get("/api/chats/:chat_id", auth, async (req, res) => {
   try {
     const chat_id = req.params.chat_id;
-    const chat = await getChatById(chat_id);
+    const user = req.user;
+    const chat = await getChatById(chat_id, user);
     res
       .status(200)
       .send({ message: "Tai doan chat thành công", data: chat });
@@ -61,7 +62,7 @@ router.put("/api/chats/:chat_id", auth, async (req, res) => {
   } catch (error) {
     res.status(error.statusCode || 500).send({ message: error.message });
   }
-});
+}); 
 
 
 // Delete chat
@@ -79,30 +80,72 @@ router.delete("/api/chats/:chat_id", auth, async (req, res) => {
 router.post("/api/messages/:chat_id", auth, async (req, res) => {
   try {
     const id = req.params.chat_id;
-    const sent_message = await sendMessage(id, req.user, req.body);
-    res.status(201).send({ message: "Gui tin nhan thanh cong", data: sent_message});
+    const sentMessage = await sendMessage(id, req.user, req.body);
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(`chat:${id}`).emit("new_message", {
+        chatId: id,
+        message: sentMessage,
+      });
+    }
+
+    return res.status(201).json({
+      message: "Gui tin nhan thanh cong",
+      data: sentMessage,
+    });
   } catch (error) {
     res.status(error.statusCode || 500).send({ message: error.message });
   }
 });
 
-router.put("/api/messages/:chat_id ", auth, async (req, res) => {
+router.put("/api/messages/:chat_id", auth, async (req, res) => {
   try {
     const id = req.params.chat_id;
-    const index = req.body.index;
-    const target_message = await editMessage(id, req.user, req.body);
-    res.status(201).send({ message: "Sua tin nhan thanh cong", data: target_message});
+    const updatedMessage = await editMessage(id, req.user, req.body);
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(`chat:${id}`).emit("message_updated", {
+        chatId: id,
+        message: updatedMessage,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Sua tin nhan thanh cong",
+      data: updatedMessage,
+    });
   } catch (error) {
     res.status(error.statusCode || 500).send({ message: error.message });
   }
 });
 
-router.delete("/api/messages/:chat_id ", auth, async (req, res) => {
+router.delete("/api/messages/:chat_id", auth, async (req, res) => {
   try {
     const id = req.params.chat_id;
     const index = req.body.index;
-    const target_message = await deleteMessage(id, req.user, index);
-    res.status(201).send({ message: "Xoa tin nhan thanh cong", data: target_message});
+    const deletedMessage = await deleteMessage(id, req.user, index);
+
+    console.log(deletedMessage);
+
+    const io = req.app.get("io");
+
+
+
+    if (io) {
+      io.to(`chat:${id}`).emit("message_deleted", {
+        chatId: id,
+        message: deletedMessage,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Xoa tin nhan thanh cong",
+      data: deletedMessage,
+    });
   } catch (error) {
     res.status(error.statusCode || 500).send({ message: error.message });
   }

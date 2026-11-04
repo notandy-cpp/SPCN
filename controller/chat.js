@@ -62,16 +62,28 @@ const getChats = async(data) =>
     }
 }
 
-const getChatById = async(id) =>
+const getChatById = async(id, user) =>
 {
     try
     {
+        
         const chat = await Chat.findById(id);
+        
         if(!chat)
         {
             const err = new Error();
             err.statusCode = 404;
             err.message = "Doan chat khong ton tai";
+            throw err;
+        }
+        const isMember = chat.userList.some(
+            (member) => member.username === user.username
+        );
+
+        if (!isMember){
+            const err = new Error();
+            err.statusCode = 403;
+            err.message = "Nguoi dung khong thuoc doan chat";
             throw err;
         }
         return chat;
@@ -143,7 +155,7 @@ const sendMessage = async (id, user, data) =>
 {
     try {
         const { content, replyTo = null } = data;
-        if (!content.trim()) 
+        if (typeof content !== "string" || !content.trim()) 
         {
             const err = new Error();
             err.statusCode = 400;
@@ -186,59 +198,61 @@ const sendMessage = async (id, user, data) =>
     }
 }
 
-const editMessage = async (id, user, data) =>
-{
-    try {
-        const { content, index = null } = data;
-        if (!content.trim()) 
-        {
-            const err = new Error();
-            err.statusCode = 400;
-            err.message = "Tin nhan khong hop le";
-            throw err;
-        }
-        const chat = await Chat.findById(id);
-        
-        if (!chat){
-            const err = new Error();
-            err.statusCode = 404;
-            err.mecssage = "Doan chat khong ton tai";
-            throw err;
-            
-        }
-        
-        
+const editMessage = async (id, user, data) => {
+  try {
+    const { content, index } = data;
 
-        if (!chat.messages[index].sender === user.username)
-        {
-            const err = new Error();
-            err.statusCode = 400;
-            err.mecssage = "Khong the sua tin nhan nguoi dung khac";
-            throw err;
-        }
-        
-        
-
-        const message = {
-            content : content.trim(),
-            edited : true,
-        }
-
-            chat.messages[index] = {
-            ...message
-        }
-
-
-
-        await chat.save();
-        
-        return chat.messages[index];
-
-
-    } catch (error) {
-        throw error;
+    if (typeof content !== "string" || !content.trim()) {
+      const err = new Error("Tin nhan khong hop le");
+      err.statusCode = 400;
+      throw err;
     }
-}
+
+    const chat = await Chat.findById(id);
+
+    if (!chat || chat.status !== "active") {
+      const err = new Error("Doan chat khong ton tai hoac da bi xoa");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    
+
+    if (
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= chat.messages.length
+    ) {
+      const err = new Error("Vi tri tin nhan khong hop le");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const message = chat.messages[index];
+
+    if (message.deleted) {
+      const err = new Error("Tin nhan da bi xoa");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (message.sender !== user.username) {
+      const err = new Error("Khong the sua tin nhan nguoi dung khac");
+      err.statusCode = 403;
+      throw err;
+    }
+
+    message.content = content.trim();
+    message.edited = true;
+
+    await chat.save();
+
+    return message;
+  } catch (error) {
+    throw error;
+  }
+};
+
 
 const deleteMessage = async (id, user, index) =>
 {
@@ -248,15 +262,36 @@ const deleteMessage = async (id, user, index) =>
         if (!chat){
             const err = new Error();
             err.statusCode = 404;
-            err.mecssage = "Doan chat khong ton tai";
+            err.message = "Doan chat khong ton tai";
             throw err;
             
         }
-                
-        const adminList = chat.userList;
+        
+        
 
-        let checkAuth = false;
-        adminList.forEach(member => {if (member.role === "admin" && member.username === user.username || (chat.messages[index].sender === user.username) ) {checkAuth = true;}});
+        if (
+            !Number.isInteger(index) ||
+            index < 0 ||
+            index >= chat.messages.length    ) 
+        {
+            const err = new Error("Vi tri tin nhan khong hop le");
+            err.statusCode = 400;
+            throw err;
+        }
+
+
+        const isAdmin = chat.userList.some(
+        (member) => member.role === "admin" && member.username === user.username,
+        );
+
+        const isModerator = chat.userList.some(
+        (member) => member.role === "moderator" && member.username === user.username,
+        );
+
+        const isSender = chat.messages[index].sender === user.username;
+
+        checkAuth = (isAdmin || isModerator || isSender);
+
         if(!checkAuth)
         {
             const err = new Error();
@@ -264,6 +299,7 @@ const deleteMessage = async (id, user, index) =>
             err.message = "Bạn không có quyền xoa tin nhan này";
             throw err;
         }
+        
         
         chat.messages[index].deleted = true;
 
