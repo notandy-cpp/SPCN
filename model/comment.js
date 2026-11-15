@@ -3,6 +3,11 @@ const mongoose = require ('mongoose');
 const commentSchema = new mongoose.Schema
 (
     {
+        // post_id:
+        // {
+        //     type: String,
+        //     require: true,
+        // },
         user_id: 
         {
             type: String,

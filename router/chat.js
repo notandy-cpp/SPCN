@@ -17,7 +17,7 @@ const {
 // Create a new chat
 router.post("/api/chats", auth, async (req, res) => {
   try {
-    const chat = await createChat(req.body);
+    const chat = await createChat(req.body, req.user);
     res.status(201).send({ message: "Tạo chat thanh cong", data: chat});
   } catch (error) {
     res.status(error.statusCode || 500).send({ message: error.message });

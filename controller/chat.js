@@ -4,13 +4,40 @@ const { request } = require("express");
 const jwt = require("jsonwebtoken");
 
 // Create a new chat
-const createChat = async (data) => {
+const createChat = async (data, user) => {
     try {
-        const chat = new Chat(data);
+        if (!user?.username) {
+            const err = new Error("Chua dang nhap");
+            err.statusCode = 401;
+            throw err;
+        }
+
+        if (typeof data.name !== "string" || !data.name.trim()) {
+            const err = new Error("Ten nhom khong hop le");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // Keep only the other members, ignoring whatever the client says about roles
+        const others = Array.isArray(data.userList) ? data.userList : [];
+        const seen = new Set([user.username]);
+        const members = [{ username: user.username, role: "admin" }];
+
+        for (const m of others) {
+            const username = typeof m === "string" ? m : m?.username;
+            if (!username || seen.has(username)) continue;
+            seen.add(username);
+            members.push({ username, role: "member" });
+        }
+
+        const chat = new Chat({
+            name: data.name.trim(),
+            userList: members,
+            memberCount: members.length,
+        });
         await chat.save();
         return chat;
-    }
-    catch (error) {
+    } catch (error) {
         throw error;
     }
 };
@@ -76,6 +103,10 @@ const getChatById = async(id, user) =>
             err.message = "Doan chat khong ton tai";
             throw err;
         }
+
+        console.log(user);
+        console.log(chat.userList);
+
         const isMember = chat.userList.some(
             (member) => member.username === user.username
         );
