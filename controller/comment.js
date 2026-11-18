@@ -1,97 +1,71 @@
-const Comment = require("../model/comment");
-const Post = require("../model/post");
-const User = require("../model/user");
+const Comment = require('../model/comment');
+const User = require('../model/user');
 
-// Create a new comment
-const createComment = async (data) => {
-  try {
-    const comment = new Comment(data);
-    await comment.save();
-    return comment;
-  } catch (error) {
-    throw error;
-  }
+const withUsername = async (comment) => {
+  if (!comment) return comment;
+  const c = comment.toObject ? comment.toObject() : comment;
+  const user = await User.findById(c.user_id).select('username');
+  c.username = user ? user.username : null;
+  return c;
 };
 
-// Get comments
-const getCommentsByPostId = async (post_id) => {
-  try {
-    const comments = await Comment.find({ post_id });
-    return comments;
-  } catch (error) {
-    throw error;
-  }
+exports.createComment = async (data) => {
+  const comment = await Comment.create(data);
+  return withUsername(comment);
 };
 
-const getCommentsByUserId = async (user_id) => {
-  try {
-    const comments = await Comment.find({ user_id });
-    return comments;
-  } catch (error) {
-    throw error;
-  }
+exports.getCommentsByPostId = async (post_id) => {
+  const comments = await Comment.find({ post_id }).sort({ createdAt: 1 });
+  return Promise.all(comments.map((c) => withUsername(c)));
 };
 
-const getCommentById = async (id) => {
-  try {
-    const comment = await Comment.findById(id);
-    if (!comment) {
-      const err = new Error();
-      err.statusCode = 404;
-      err.message = "Bình luận không tồn tại";
-      throw err;
-    }
-    return comment;
-  } catch (error) {
-    throw error;
-  }
+exports.getCommentsByUserId = async (user_id) => {
+  const comments = await Comment.find({ user_id }).sort({ createdAt: -1 });
+  return Promise.all(comments.map((c) => withUsername(c)));
 };
 
-// Update comment
-const updateComment = async (id, updateData, user_id) => {
-  try {
-    const comment = await getCommentById(id);
-    if (comment.user_id !== user_id) {
-      const err = new Error();
-      err.statusCode = 403;
-      err.message = "Bạn không có quyền chỉnh sửa bình luận này";
-      throw err;
-    }
-    updateData.editStatus = {
+exports.getCommentById = async (id) => {
+  const comment = await Comment.findById(id);
+  return withUsername(comment);
+};
+
+exports.updateComment = async (id, updateData, user_id) => {
+  const comment = await Comment.findById(id);
+  if (!comment) {
+    const err = new Error('Bình luận không tồn tại');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (String(comment.user_id) !== String(user_id)) {
+    const err = new Error('Bạn không có quyền sửa bình luận này');
+    err.statusCode = 403;
+    throw err;
+  }
+  if (updateData.content !== undefined && updateData.content !== comment.content) {
+    comment.editStatus.push({
       editedAt: new Date(),
       content: comment.content,
-    };
-    await comment.set(updateData);
-    await comment.save();
-    return comment;
-  } catch (error) {
-    throw error;
+    });
+    comment.content = updateData.content;
   }
+  await comment.save();
+  return withUsername(comment);
 };
 
-// Delete comment
-const deleteComment = async (id, user) => {
-  try {
-    const comment = await getCommentById(id);
-    if (comment.user_id != user._id && user.role != "admin") {
-      const err = new Error();
-      err.statusCode = 403;
-      err.message = "Bạn không có quyền xóa bình luận này";
-      throw err;
-    }
-    comment.status = "deleted";
-    await comment.save();
-    return comment;
-  } catch (error) {
-    throw error;
+exports.deleteComment = async (id, user) => {
+  const comment = await Comment.findById(id);
+  if (!comment) {
+    const err = new Error('Bình luận không tồn tại');
+    err.statusCode = 404;
+    throw err;
   }
-};
-
-module.exports = {
-  createComment,
-  getCommentsByPostId,
-  getCommentsByUserId,
-  getCommentById,
-  updateComment,
-  deleteComment,
+  const isOwner = String(comment.user_id) === String(user._id);
+  const isAdmin = user.role === 'admin';
+  if (!isOwner && !isAdmin) {
+    const err = new Error('Bạn không có quyền xóa bình luận này');
+    err.statusCode = 403;
+    throw err;
+  }
+  await Comment.findByIdAndDelete(id);
+  return { _id: id };
 };

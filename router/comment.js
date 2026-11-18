@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Comment = require("../model/comment");
-const { authMiddleware: auth, adminRole } = require("../middleware/auth");
+const { authMiddleware: auth } = require("../middleware/auth");
 
 const {
   createComment,
@@ -15,26 +14,28 @@ const {
 // Create a new comment
 router.post("/api/comment", auth, async (req, res) => {
   try {
-    const user_id = req.user._id;
-    req.body.user_id = user_id;
-    
-    const comment = await createComment(req.body);
-    res
-      .status(201)
-      .json({ message: "Tạo bình luận thành công", data: comment });
+    const data = {
+      post_id: req.body.post_id,
+      user_id: req.user._id,
+      content: req.body.content,
+    };
+    if (!data.post_id) {
+      return res.status(400).json({ message: "Thiếu post_id" });
+    }
+    const comment = await createComment(data);
+    res.status(201).json({ message: "Tạo bình luận thành công", data: comment });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
   }
 });
 
-// Get comments
+// Get comments by post
 router.get("/api/comment/post/:post_id", async (req, res) => {
   try {
-    const post_id = req.params.post_id;
-    const comments = await getCommentsByPostId(post_id);
+    const comments = await getCommentsByPostId(req.params.post_id);
     res.status(200).json({
       message: "Lấy danh sách bình luận thành công",
-      data: { comments, post_id: post_id },
+      data: { comments, post_id: req.params.post_id },
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
@@ -43,11 +44,10 @@ router.get("/api/comment/post/:post_id", async (req, res) => {
 
 router.get("/api/comment/user/:user_id", async (req, res) => {
   try {
-    const user_id = req.params.user_id;
-    const comments = await getCommentsByUserId(user_id);
+    const comments = await getCommentsByUserId(req.params.user_id);
     res.status(200).json({
       message: "Lấy danh sách bình luận thành công",
-      data: { comments, user_id: user_id },
+      data: { comments, user_id: req.params.user_id },
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
@@ -56,12 +56,8 @@ router.get("/api/comment/user/:user_id", async (req, res) => {
 
 router.get("/api/comment/:id", async (req, res) => {
   try {
-    const id = req.params.id;
-    const comment = await getCommentById(id);
-    res.status(200).json({
-      message: "Lấy bình luận thành công",
-      data: comment,
-    });
+    const comment = await getCommentById(req.params.id);
+    res.status(200).json({ message: "Lấy bình luận thành công", data: comment });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
   }
@@ -70,12 +66,12 @@ router.get("/api/comment/:id", async (req, res) => {
 // Update comment
 router.put("/api/comment/:id", auth, async (req, res) => {
   try {
-    const id = req.params.id;
-    const user_id = req.user._id.toString();
-    const comment = await updateComment(id, req.body, user_id);
-    res
-      .status(200)
-      .json({ message: "Cập nhật bình luận thành công", data: comment });
+    const comment = await updateComment(
+      req.params.id,
+      req.body,
+      req.user._id.toString()
+    );
+    res.status(200).json({ message: "Cập nhật bình luận thành công", data: comment });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
   }
@@ -84,12 +80,7 @@ router.put("/api/comment/:id", auth, async (req, res) => {
 // Delete comment
 router.delete("/api/comment/:id", auth, async (req, res) => {
   try {
-    const id = req.params.id;
-    const user = {
-      _id: req.user._id.toString(),
-      role: req.user.role,
-    };
-    await deleteComment(id, req.user);
+    await deleteComment(req.params.id, req.user);
     res.status(200).json({ message: "Xóa bình luận thành công" });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });

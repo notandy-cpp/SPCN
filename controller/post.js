@@ -1,147 +1,92 @@
-const Post = require('../model/post')
+const Post = require('../model/post');
+const User = require('../model/user');
 
+// Helper: attach username to a single post
+const withUsername = async (post) => {
+  if (!post) return post;
+  const p = post.toObject ? post.toObject() : post;
+  const user = await User.findById(p.user_id).select('username');
+  p.username = user ? user.username : null;
 
-const createPost = async(data) =>
-{
-    try
-    {
-        const post = new Post(data);
-        await post.save();
-        return post;
-    }
-    catch (error)
-    {
-        throw error;
-    }
-}
+  // attach usernames to nested comments if present
+  if (Array.isArray(p.comments) && p.comments.length) {
+    const userIds = [...new Set(p.comments.map((c) => c.user_id))];
+    const users = await User.find({ _id: { $in: userIds } }).select('username');
+    const map = {};
+    users.forEach((u) => (map[String(u._id)] = u.username));
+    p.comments = p.comments.map((c) => ({
+      ...c,
+      username: map[String(c.user_id)] || null,
+    }));
+  }
+  return p;
+};
 
-const getPosts = async() =>
-{
-    try
-    {
-        const posts = await Post.find();
-        return posts;
+exports.createPost = async (data) => {
+  const post = await Post.create(data);
+  return post;
+};
 
-    }
-    catch (error)
-    {
-        throw error;
-    }
-}
+exports.getPosts = async () => {
+  const posts = await Post.find({ status: { $ne: 'deleted' } }).sort({
+    createdAt: -1,
+  });
+  return Promise.all(posts.map((p) => withUsername(p)));
+};
 
+exports.getPostsByUserId = async (user_id) => {
+  const posts = await Post.find({ user_id }).sort({ createdAt: -1 });
+  return Promise.all(posts.map((p) => withUsername(p)));
+};
 
-const getPostsByUserId = async(user_id) =>
-{
-    try
-    {
-        const user = await User.findById(user_id);
-        if(!user)
-        {
-            const err = new Error();
-            err.statusCode = 404;
-            err.message = "Bai viet khong ton tai";
-            throw err;
-        }
-        const posts = await Post.find({user_id: user_id});
-        return posts;
-    }
-    catch (error)
-    {
-        throw error;
-    }
-}
+exports.getPostById = async (id) => {
+  const post = await Post.findById(id);
+  return withUsername(post);
+};
 
-const getPostById = async(id) =>
-{
-    try
-    {
-        const post = await User.findById(id);
-        if(!post)
-        {
-            const err = new Error();
-            err.statusCode = 404;
-            err.message = "Bai viet khong ton tai";
-            throw err;
-        }
-        return post;
-    }
-    catch (error)
-    {
-        throw error;
-    }
-}
+exports.updatePost = async (id, updateData, user) => {
+  const post = await Post.findById(id);
+  if (!post) {
+    const err = new Error('Bài viết không tồn tại');
+    err.statusCode = 404;
+    throw err;
+  }
+  const isOwner = String(post.user_id) === String(user._id);
+  const isAdmin = user.role === 'admin';
+  if (!isOwner && !isAdmin) {
+    const err = new Error('Bạn không có quyền sửa bài viết này');
+    err.statusCode = 403;
+    throw err;
+  }
 
+  // record edit history
+  if (post.title !== updateData.title || post.content !== updateData.content) {
+    post.editStatus.push({
+      editedAt: new Date(),
+      title: post.title,
+      content: post.content,
+    });
+  }
+  if (updateData.title !== undefined) post.title = updateData.title;
+  if (updateData.content !== undefined) post.content = updateData.content;
+  await post.save();
+  return withUsername(post);
+};
 
-const updatePost = async(id, updateData, user) =>
-{
-    try
-    {
-        const post = await Post.findById(id);
-        if(!post)
-        {
-            const err = new Error();
-            err.statusCode = 404;
-            err.message = "Bai viet khong ton tai";
-            throw err;
-        }
-        if (user.role !== "admin" && post.user_id !== user._id) 
-        {
-            const err = new Error();
-            err.statusCode = 403;
-            err.message = "Bạn không có quyền chỉnh sửa bài viết này";
-            throw err;
-        }
-
-        const editStatus = 
-        {
-            editedAt : new Date(),
-            content : post.content,
-            title : post.title,    
-        }
-        await post.set(updateData);
-        await post.save();
-        return post;
-    }
-    catch (error)
-    {
-        throw error;
-    }
-}
-
-
-const deletePost = async(id) =>
-{
-    try
-    {
-        const post = await Post.findById(id);
-        if(!post)
-        {
-            const err = new Error();
-            err.statusCode = 404;
-            err.message = "Bai viet khong ton tai";
-            throw err;
-        }
-        if (user.role !== "admin") 
-        {
-            const err = new Error();
-            err.statusCode = 403;
-            err.message = "Bạn không có quyền chỉnh sửa bài viết này";
-            throw err;
-        }
-        post.status = "deleted";
-        await post.save();
-        return post;
-    }
-    catch (error)
-    {
-        throw error;
-    }
-}
-
-module.exports = {
-  createPost,
-  getPosts,
-  getPostById,
-  updatePost,
-  deletePost,
+exports.deletePost = async (id, user) => {
+  const post = await Post.findById(id);
+  if (!post) {
+    const err = new Error('Bài viết không tồn tại');
+    err.statusCode = 404;
+    throw err;
+  }
+  const isOwner = String(post.user_id) === String(user._id);
+  const isAdmin = user.role === 'admin';
+  if (!isOwner && !isAdmin) {
+    const err = new Error('Bạn không có quyền xóa bài viết này');
+    err.statusCode = 403;
+    throw err;
+  }
+  await Post.findByIdAndDelete(id);
+  return { _id: id };
 };
